@@ -105,6 +105,59 @@ All outputs and CSV files will be generated in the `outputs/` directory.
 
 ## Part 4 findings
 
+- **R4.1 — Split Purity, Overfitting & Tree Depth Controls**:
+  - Split $S_4$ ($X_1 \le 24$, customer tenure $\le 24$ months) is the purest split, yielding the highest information gain (`info_gain = 0.1252`) and highest Gini gain (`gini_gain = 0.0606`) by partitioning the 560 training records into a high-churn subset of 188 newer accounts (86 positives, 45.74% churn rate) and 372 mature accounts (33 positives, 8.87% churn rate).
+  - Growing a decision tree until every leaf is pure causes the model to memorize random training noise, outliers, and sample-specific idiosyncrasies, creating excessively fragmented decision boundaries that fail to generalize to unseen test distributions.
+  - Setting a maximum tree depth constraint (`max_depth`) or requiring a minimum number of samples per leaf node (`min_samples_leaf`) serves as an effective stopping rule to curtail recursive partitioning before variance inflates.
+
+- **R4.2 — Voting Ensembles & Model Selection**:
+  - We recommend deploying the single **logistic regression** model (`tau = 0.3`).
+  - Combining models did not improve performance: logistic regression achieved the top F1 score (`f1 = 0.5714`, `recall = 0.7451`), surpassing both hard voting (`f1 = 0.5344`, `recall = 0.6863`) and soft voting (`f1 = 0.5507`, `recall = 0.7451`), as well as the decision stump (`f1 = 0.5532`, `recall = 0.7647`) and KNN (`f1 = 0.3696`, `recall = 0.3333`).
+  - Ensembling weakened performance because the lower predictive quality and uncalibrated probabilities of the KNN model degraded the smooth, well-calibrated decision boundary established by logistic regression.
+
+- **R4.3 — AdaBoost Sample Reweighting Dynamics**:
+  - The total weight of the two misclassified points (Points 3 and 7) after Round 1 normalisation is `0.2500 + 0.2500 = 0.5000` (exactly half of the total ensemble weight distribution).
+  - Round 2 assigns greater trust to $h_2$ than Round 1 assigned to $h_1$ ($\alpha_2 = 0.8047$ vs $\alpha_1 = 0.5493$) because $h_2$ successfully classifies both of the heavily reweighted prior error cases (Points 3 and 7) while maintaining a lower weighted error rate ($\epsilon_2 = 0.1667$ vs $\epsilon_1 = 0.2500$).
+
+- **R4.4 — Neural Architecture Sizing, Activation Choices & Residual Highways**:
+  - **Model A (Option 2 — CNN) Layer Sizing Table**:
+    | Layer | Output Shape ($H \times W \times D$) | Parameter Count |
+    |---|---|---|
+    | `conv1` ($5 \times 5$, 6 filters, pad 2, stride 1) + ReLU | $28 \times 28 \times 6$ | 156 |
+    | `pool1` ($2 \times 2$ max-pool, stride 2) | $14 \times 14 \times 6$ | 0 |
+    | `conv2` ($5 \times 5$, 16 filters, pad 0, stride 1) + ReLU | $10 \times 10 \times 16$ | 2,416 |
+    | `pool2` ($2 \times 2$ max-pool, stride 2) | $5 \times 5 \times 16$ | 0 |
+    | `flatten` | 400 | 0 |
+    | `dense1` (32 neurons) + ReLU | 32 | 12,832 |
+    | `dense2` (10 neurons, output) | 10 | 330 |
+    | **Total CNN Parameters** | — | **15,734** |
+  - **Model B (RNN Shapes & Sequence Invariance)**:
+    - Weight matrix shapes: $W_{xh} \in \mathbb{R}^{128 \times 64}$, $W_{hh} \in \mathbb{R}^{128 \times 128}$, $W_{hy} \in \mathbb{R}^{16 \times 128}$, with bias vectors $b_h \in \mathbb{R}^{128}$ and $b_y \in \mathbb{R}^{16}$.
+    - Parameter count invariance: `rnn_total = 26768` remains strictly constant regardless of input sequence length because the recurrent cell shares the exact same projection matrices and biases across every unrolled time step.
+  - **Activation & Loss Specifications (10 Classes)**:
+    - Hidden layers: ReLU ($\max(0, x)$) for fast non-saturating gradients.
+    - Output layer: Softmax ($\sigma(z)_i = \frac{e^{z_i}}{\sum_{j=1}^{10} e^{z_j}}$) paired with Categorical Cross-Entropy loss ($-\sum_{k=1}^{10} y_k \ln \hat{y}_k$).
+  - **Vanishing Gradients & Skip Connections**:
+    - In deep plain networks, repeated backpropagation multiplications by weight matrices and fractional activation derivatives cause gradient magnitudes to diminish exponentially as they travel toward the input, leaving initial layers virtually untrained.
+    - A residual skip connection ($x + \mathcal{F}(x)$) introduces an uninterrupted identity pathway with gradient derivative $1 + \mathcal{F}'(x)$, guaranteeing that error signals flow directly to early layers without attenuation.
+
 ## Model-choice memo
 
+**To:** Head of Customer Retention, Flipkart  
+**From:** Decision Intelligence Analytics Team  
+**Subject:** Production Churn Alert Model Recommendation  
+
+We recommend deploying the **logistic regression classifier** for live churn alerts. In test evaluations (Task 4.2), logistic regression attained the highest F1 score (`0.5714`) and tied for highest recall (`0.7451`, catching 38 of 51 churners) with precision of `0.4634`. It decisively outperformed K-nearest neighbours (`f1 = 0.3696`), the decision stump (`f1 = 0.5532`), hard voting (`f1 = 0.5344`), and soft voting (`f1 = 0.5507`). Ensembling degraded performance because KNN's weaker predictions compromised logistic regression's calibrated probability surface.
+
+For production, we recommend the cost-optimal alert threshold of **$\tau = 0.15$**, chosen by minimizing business expense on training data. Given Flipkart's asymmetric cost reality—INR 50 per false retention coupon versus INR 400 per missed churning customer—operating at $\tau = 0.15$ incurs a test cost of **INR 6,050**. In comparison, the conventional $\tau = 0.5$ threshold incurs **INR 11,800**, while flagging nobody costs **INR 20,400**. Operating at $\tau = 0.15$ reduces costs by 48.7% versus $\tau = 0.5$ and saves INR 14,350 over inaction on this 240-customer test cohort.
+
+**Operational Risk:** Our evidence relies on a single synthetic 70/30 split with only 51 test churners; real customer variance may alter coupon spending.
+
+**Unstructured Model Priority:** Neither Model A (image sorter) nor Model B (review topic RNN) is worth building before the structured churn model is deployed, as churn intervention directly defends revenue while visual and text processing are secondary enhancements.
+
 ## Limitations
+
+1. **Synthetic Data Generation**: All records were synthetically generated through parametric mathematical formulas; they lack real-world e-commerce complexities such as multi-channel browsing touchpoints, festive Diwali seasonality spikes, regional delivery logistics bottlenecks, or fraudulent account abuse.
+2. **Single Static Train-Test Partition**: The analytical pipeline relies on a single deterministic 70/30 stratified split (560 training / 240 test records). Without out-of-time temporal validation or repeated nested cross-validation, the reported performance metrics carry unavoidable sampling variance.
+3. **Small Positive Holdout Sample (51 Records)**: The holdout test set contains only 51 churning customers (`test_positives = 51`), meaning each individual customer prediction alters recall and precision by approximately 2.0 percentage points, making precision-recall estimates sensitive to small boundary perturbations.
+4. **Absence of Regularization and Dynamic Feature Engineering**: Predictors were used strictly in linear/standardized form without interaction terms (e.g., tenure $\times$ discount share), polynomial transformations, or L1/L2 shrinkage penalties (Ridge/Lasso), which could further suppress variance in high-dimensional production environments.
