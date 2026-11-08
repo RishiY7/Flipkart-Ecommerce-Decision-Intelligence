@@ -45,6 +45,31 @@ All outputs and CSV files will be generated in the `outputs/` directory.
 
 ## Part 2 findings
 
+- **R2.1 — Learning Rate Dynamics**:
+  - The training losses after 200 epochs ordered from lowest to highest are: $\eta = 1.0$ (`0.3703`) < $\eta = 0.1$ (`0.3776`) < $\eta = 0.01$ (`0.5091`).
+  - A learning rate that is too small ($\eta = 0.01$) exhibits sluggish convergence and remains underfitted after 200 steps, whereas a larger learning rate ($\eta = 1.0$) rapidly descends the convex binary cross-entropy surface without numerical instability or overshoot.
+
+- **R2.2 — Key Predictors & Odds Ratio Interpretation**:
+  - The three predictors with the largest absolute weights in the model are:
+    1. $X_3$ (`discount_order_share`, weight = `0.9013`, odds ratio = `2.4629`)
+    2. $X_1$ (`customer_tenure_months`, weight = `-0.5554`, odds ratio = `0.5739`)
+    3. $X_2$ (`complaint_count_90d`, weight = `0.5505`, odds ratio = `1.7341`)
+  - *Domain interpretation of largest odds ratio:* Holding other factors constant, each one-standard-deviation increase in a customer's discount order share multiplies the odds of churn by approximately 2.46 (a ~146% surge in churn odds), signaling that deal-seeking shoppers have low brand stickiness and depart once promotional incentives subside.
+
+- **R2.3 — Evaluation Metric Realities & Threshold Tuning**:
+  - The naive `blind_accuracy` is `0.7875` (achieved by predicting zero churn for every customer), closely matching the model's accuracy at $\tau = 0.5$ (`tau_0.5_accuracy = 0.8042`), which illustrates why overall accuracy is fundamentally misleading on imbalanced datasets where missing rare positive churners carries grave business consequences.
+  - Lowering $\tau$ from 0.5 to 0.3 boosts recall from `0.4706` to `0.7451` (catching 38 of 51 churners instead of only 24), while precision shifts from `0.5455` to `0.4634`, an acceptable trade-off given the asymmetric cost structure.
+
+- **R2.4 — Logistic Regression vs K-Nearest Neighbours**:
+  - Comparing the logistic regression model at $\tau = 0.3$ against the cross-validated KNN model ($K = 5$):
+    - **Logistic ($\tau = 0.3$):** `f1 = 0.5714`, `recall = 0.7451`
+    - **KNN ($K = 5$):** `f1 = 0.3696`, `recall = 0.3333`
+  - The parametric logistic model establishes a coherent global boundary and dramatically outperforms KNN, which fails to overcome local density imbalances and misses two out of every three churners.
+
+- **R2.5 — Financial Deployment Decision & Leakage Prevention**:
+  - We recommend deploying the logistic regression model at the cost-optimal alert threshold of $\tau = 0.15$, which incurs a test cost of `INR 6050`, representing a 48.7% cost reduction compared to $\tau = 0.5$ (`INR 11800`) and a 70.3% savings relative to no intervention (`cost_test_flag_nobody = INR 20400`).
+  - The alert threshold was optimized strictly on the training set to prevent data leakage and ensure that reported financial savings reflect genuine generalization to new, unseen customer cohorts.
+
 ## Part 3 findings
 
 ## Part 4 findings

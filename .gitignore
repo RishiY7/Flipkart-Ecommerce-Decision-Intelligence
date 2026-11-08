@@ -4,3 +4,8 @@ Problem Statement.md
 
 # Execution Plan
 plan.md
+
+# Python cache
+__pycache__/
+*.py[cod]
+
