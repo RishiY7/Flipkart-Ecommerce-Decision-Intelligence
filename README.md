@@ -72,6 +72,37 @@ All outputs and CSV files will be generated in the `outputs/` directory.
 
 ## Part 3 findings
 
+- **R3.1 — Elbow Analysis & Deterministic WCSS Drops**:
+  - The successive WCSS drops across $K \in \{2, 3, 4, 5, 6\}$ are:
+    - $\text{WCSS}(2) - \text{WCSS}(3) = 2262.6753 - 1602.8471 = 659.8282$
+    - $\text{WCSS}(3) - \text{WCSS}(4) = 1602.8471 - 1494.7732 = 108.0739$
+    - $\text{WCSS}(4) - \text{WCSS}(5) = 1494.7732 - 1323.7157 = 171.0575$
+    - $\text{WCSS}(5) - \text{WCSS}(6) = 1323.7157 - 1278.1691 = 45.5466$
+  - The elbow criterion selects `elbow_k = 3` because the drop from $K=3$ to $K=4$ (`108.0739`) is strictly less than half the preceding reduction ($0.5 \times 659.8282 = 329.9141$). The non-monotonic drop rebound from $K=4$ to $K=5$ occurs because the pinned, uniform index initializations provide a fully deterministic and reproducible benchmark rather than guarantees of the global minimum at each intermediate $K$.
+
+- **R3.2 — Customer Segmentation & Strategic Actions**:
+  - **Segment A (Size: 322) — "Premium Loyal"**:
+    - *Profile:* High tenure (47.50 months), low friction (1.95 complaints), low discount dependence (22.50%), highest loyalty score (62.16), and minimal churn (`outcome_rate = 0.0186`).
+    - *Action:* Fast-track to Flipkart Plus / VIP perks, offer exclusive early access to annual sales, and retain brand affinity without diluting margin via aggressive discounting.
+  - **Segment B (Size: 255) — "High-AOV / Service-Sensitive Spenders"**:
+    - *Profile:* Highest past and present spending (`mean_X4 = 28.72` hundred INR, `mean_value = 17.12`), moderate tenure (28.61 months), highest friction (`mean_X2 = 6.07` complaints), and moderate churn (`outcome_rate = 0.2353`).
+    - *Action:* Route complaints to dedicated white-glove customer support desks and prioritize expedited logistics to safeguard high-margin revenue streams.
+  - **Segment C (Size: 223) — "Bargain-Focused Deal Chasers"**:
+    - *Profile:* Heavily promotional (`mean_X3 = 0.7118` discount share), short tenure (14.39 months), depressed loyalty scores (38.52), and highest churn (`outcome_rate = 0.4664`).
+    - *Action:* Deploy targeted flash promotions with minimum-order thresholds and app push reminders to stem attrition.
+  - *Highest churn segment:* **Segment C** records the highest churn outcome rate at `0.4664` (46.64%).
+
+- **R3.3 — Hierarchical Clustering & Linkage Disagreement**:
+  - *Single linkage clusters at cut (4 clusters):* `{E2, E3, E6}`, `{E1}`, `{E4}`, `{E5}`.
+  - *Complete linkage clusters at cut (2 clusters):* `{E1, E4, E5}`, `{E2, E3, E6}`.
+  - *Explanation of disagreement:* Single linkage assesses cluster proximity using the minimum distance between any single pair of points, which creates an elongated chaining effect that delays the consolidation of E1, E4, and E5. In contrast, complete linkage uses the maximum pairwise distance, penalizing loose chains and enforcing compact, globally coherent groupings that cleanly bifurcate the cohorts into two distinct macro-clusters (`{E1, E4, E5}` and `{E2, E3, E6}`).
+
+- **R3.4 — PCA Loadings, Dimensionality Sizing & Segment Projection**:
+  - The standardized feature matrix has a mean vector of all zeros, which was centred by construction.
+  - The first principal component (52.27% of variance) is driven positively by customer tenure ($X_1$, loading `0.5317`) and loyalty score ($X_5$, loading `0.4418`), and strongly negatively by discount order share ($X_3$, loading `-0.5187`) and complaint counts ($X_2$, loading `-0.4100`).
+  - Sizing for at least 80% cumulative variance requires 3 components (`components_for_80pct = 3`), capturing 86.16% of total variance.
+  - Projecting the segments onto PC1 shows clear structural alignment: `mean_pc1_segment_A = 1.7773`, `mean_pc1_segment_B = -0.7831`, and `mean_pc1_segment_C = -1.6709`. PC1 functions as a comprehensive customer relationship health score, separating loyal advocates from dissatisfied spenders and discount chasers.
+
 ## Part 4 findings
 
 ## Model-choice memo
